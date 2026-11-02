@@ -27,7 +27,7 @@ async function main() {
   }
   for (const h of seed.holdings) {
     const data = {
-      name: h.name, category: h.category ?? '', owner: h.owner ?? '', purpose: h.purpose ?? '',
+      name: h.name, category: h.category ?? '', owner: h.owner ?? '', purpose: h.purpose ?? '', place: h.place ?? '',
       unit: h.unit, value: h.value == null ? null : BigInt(h.value), grams: h.grams ?? null,
       price: h.price ?? null, monthly: h.monthly ?? null, since: h.since ?? null,
       estimate: !!h.estimate, note: h.note ?? '', priceDate: h.priceDate ?? null,

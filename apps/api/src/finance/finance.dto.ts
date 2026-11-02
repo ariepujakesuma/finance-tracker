@@ -1,4 +1,9 @@
+import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  ValidateNested,
   IsBoolean,
   IsIn,
   IsInt,
@@ -26,6 +31,11 @@ export class EntryDto {
   @IsOptional() @IsString() @MaxLength(255) note?: string;
 }
 
+export class BulkEntriesDto {
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(100) @ValidateNested({ each: true }) @Type(() => EntryDto)
+  entries: EntryDto[];
+}
+
 export class MonthDto {
   @IsObject() paid: Record<string, boolean>;
   @IsObject() amt: Record<string, number>;
@@ -36,6 +46,7 @@ export class HoldingDto {
   @IsOptional() @IsString() @MaxLength(60) category?: string;
   @IsOptional() @IsString() @MaxLength(60) owner?: string;
   @IsOptional() @IsString() @MaxLength(120) purpose?: string;
+  @IsOptional() @IsString() @MaxLength(60) place?: string;
   @IsIn(['rp', 'gram']) unit: string;
   @IsOptional() @ValidateIf((_, v) => v !== null) @IsInt() @Min(0) value?: number | null;
   @IsOptional() @ValidateIf((_, v) => v !== null) @IsNumber() @Min(0) grams?: number | null;

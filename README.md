@@ -66,6 +66,22 @@ Buat secret acak dengan `openssl rand -base64 48`.
 2. Environment variable: `API_URL` = URL API dari langkah 3 (tanpa `/` di akhir).
 3. Deploy, buka URL web → layar **Buat PIN** muncul → isi PIN + `SETUP_KEY`.
 
+## Upload tagihan kartu kredit (PDF)
+
+Menu **⋯ → Upload tagihan PDF** atau tombol **Upload PDF** di panel tagihan.
+
+- PDF dibaca di browser dengan pdf.js. File dan password-nya tidak dikirim ke server; yang dikirim hanya baris yang disimpan.
+- Parser sudah diuji untuk **Mandiri** dan **BCA**. **Jenius** memakai pembaca umum (belum ada contoh), jadi cek setiap baris sebelum menyimpan.
+- Bulan tujuan default = bulan jatuh tempo statement.
+- Setiap baris dicocokkan dengan tagihan bank yang sama di bulan itu: **sudah ada** (dilewati), **ubah nominal** (nominal khusus bulan itu), atau **baru** (cicilan `KE x DARI y` / `x/y` otomatis jadi cicilan dengan sisa bulan yang benar).
+- Pembayaran, pembatalan (mis. "Convert to IPP"), dan baris Rp0 dilewati.
+
+Setelah update yang menambah kolom database (mis. kolom `place` di aset), jalankan lagi dari laptop:
+
+```bash
+cd apps/api && npx prisma db push
+```
+
 ## Development lokal
 
 ```bash

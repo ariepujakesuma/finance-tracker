@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
+import StatementUpload from './StatementUpload';
 import {
   active, amountOf, contribMonths, Data, daysSince, Entry, fmtDate, Holding, holdingValue, idx,
   jakartaToday, key, longL, monthCalc, MonthState, num, remainingDebt, rp, short,
@@ -22,6 +23,7 @@ export default function Dashboard() {
   const [entryForm, setEntryForm] = useState<Entry | 'new' | null>(null);
   const [assetForm, setAssetForm] = useState<Holding | 'new' | null>(null);
   const [menu, setMenu] = useState(false);
+  const [upload, setUpload] = useState(false);
   const [openBanks, setOpenBanks] = useState<Record<string, boolean>>({});
 
   const handleErr = useCallback(
@@ -32,12 +34,12 @@ export default function Dashboard() {
     [router],
   );
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (msg?: string) => {
     try {
       const d = await api<Data>('/finance');
       setData(d);
       setLoaded(true);
-      setStatus('Tersinkron');
+      setStatus(msg || 'Tersinkron');
     } catch (err) {
       handleErr(err);
     }
@@ -175,6 +177,7 @@ export default function Dashboard() {
             <button className="round" aria-label="Menu" aria-expanded={menu} onClick={() => setMenu((m) => !m)}>⋯</button>
             {menu && (
               <div className="menu glass" role="menu" onClick={() => setMenu(false)}>
+                <button role="menuitem" onClick={() => setUpload(true)}>Upload tagihan PDF</button>
                 <button role="menuitem" onClick={() => setAssetForm('new')}>Tambah aset</button>
                 <Link role="menuitem" href="/pin">Ganti PIN</Link>
                 <button role="menuitem" onClick={logout}>Keluar</button>
@@ -232,6 +235,7 @@ export default function Dashboard() {
                     <div className="meta">
                       <span className="chip">{h.category || 'Aset'}</span>
                       {h.estimate && <span className="chip ov">estimasi</span>}
+                      {h.place && <span className="chip">{h.place}</span>}
                       {h.owner && <span>{h.owner}</span>}
                       {h.purpose && <span>· {h.purpose}</span>}
                       {h.unit === 'gram' && (
@@ -279,7 +283,11 @@ export default function Dashboard() {
 
       <div className="cols">
         <section className="glass panel">
-          <div className="panel-head"><h2>Tagihan bulan ini</h2><span className="hint">Ketuk nominal untuk ubah bulan ini saja</span></div>
+          <div className="panel-head">
+            <h2>Tagihan bulan ini</h2>
+            <button className="pill on" onClick={() => setUpload(true)}>Upload PDF</button>
+          </div>
+          <p className="hint" style={{ margin: '-6px 0 10px' }}>Ketuk nominal untuk ubah bulan ini saja.</p>
           {!loaded ? (
             <div className="empty">Memuat tagihan…</div>
           ) : Object.keys(byBank).length ? (
@@ -348,6 +356,15 @@ export default function Dashboard() {
       </div>
 
       <button className="fab" aria-label="Tambah entri" onClick={() => setEntryForm('new')}>+</button>
+
+      {upload && (
+        <StatementUpload
+          data={data}
+          defaultMonth={sel}
+          onClose={() => setUpload(false)}
+          onSaved={(msg) => load(msg)}
+        />
+      )}
 
       {entryForm && (
         <EntryDialog
@@ -590,6 +607,8 @@ function EntryDialog({
 
 type HoldingBody = Omit<Holding, 'id'>;
 
+const PLACES = ['Ajaib', 'Bibit', 'Bareksa', 'BSI', 'BCA', 'Mandiri', 'Jenius', 'Pegadaian', 'Antam / fisik', 'Lainnya'];
+
 function AssetDialog({
   holding, today, onClose, onSave, onDelete,
 }: {
@@ -599,7 +618,7 @@ function AssetDialog({
   const ref = useDialog(onClose);
   const h = holding;
   const [f, setF] = useState({
-    name: h?.name || '', category: h?.category || '', owner: h?.owner || '', purpose: h?.purpose || '',
+    name: h?.name || '', category: h?.category || '', owner: h?.owner || '', purpose: h?.purpose || '', place: h?.place || '',
     unit: h?.unit || 'rp', value: h?.value != null ? String(h.value) : '', grams: h?.grams != null ? String(h.grams) : '',
     price: h?.price != null ? String(h.price) : '', monthly: h?.monthly ? String(h.monthly) : '', since: h?.since || '',
     note: h?.note || '', estimate: !!h?.estimate,
@@ -614,7 +633,7 @@ function AssetDialog({
     const priceChanged = price !== (h?.price ?? null);
     onSave(
       {
-        name: f.name.trim(), category: f.category.trim(), owner: f.owner.trim(), purpose: f.purpose.trim(),
+        name: f.name.trim(), category: f.category.trim(), owner: f.owner.trim(), purpose: f.purpose.trim(), place: f.place,
         unit: f.unit as Holding['unit'], value: gram ? null : num(f.value),
         grams: gram ? Number(f.grams.replace(',', '.')) || 0 : null, price,
         monthly: gram ? null : num(f.monthly) || null, since: gram ? null : f.since || null,
@@ -638,7 +657,15 @@ function AssetDialog({
           <label htmlFor="aOwner">Pemilik<input id="aOwner" value={f.owner} onChange={set('owner')} placeholder="Arie" /></label>
         </div>
         <datalist id="acats"><option value="Haji" /><option value="Emas" /><option value="Reksadana" /><option value="Tabungan" /><option value="Deposito" /><option value="Saham" /></datalist>
-        <label htmlFor="aPurpose">Tujuan<input id="aPurpose" value={f.purpose} onChange={set('purpose')} placeholder="mis. Pendidikan anak" /></label>
+        <div className="two">
+          <label htmlFor="aPurpose">Tujuan<input id="aPurpose" value={f.purpose} onChange={set('purpose')} placeholder="mis. Pendidikan anak" /></label>
+          <label htmlFor="aPlace">Disimpan di
+            <select id="aPlace" value={f.place} onChange={set('place')}>
+              <option value="">–</option>
+              {[...new Set([...PLACES, ...(f.place ? [f.place] : [])])].map((p) => <option key={p}>{p}</option>)}
+            </select>
+          </label>
+        </div>
         <div className="two">
           <label htmlFor="aUnit">Satuan
             <select id="aUnit" value={f.unit} onChange={set('unit')}><option value="rp">Rupiah</option><option value="gram">Gram emas</option></select>

@@ -30,6 +30,12 @@ export class FinanceService {
     return this.prisma.entry.create({ data: this.entryData(dto) }).then(strip);
   }
 
+  /** All or nothing: used when saving lines from an uploaded statement. */
+  async createEntries(list: EntryDto[]) {
+    const rows = await this.prisma.$transaction(list.map((dto) => this.prisma.entry.create({ data: this.entryData(dto) })));
+    return rows.map(strip);
+  }
+
   async updateEntry(id: string, dto: EntryDto) {
     await this.exists('entry', id);
     return this.prisma.entry.update({ where: { id }, data: this.entryData(dto) }).then(strip);
@@ -83,6 +89,7 @@ export class FinanceService {
       category: dto.category?.trim() ?? '',
       owner: dto.owner?.trim() ?? '',
       purpose: dto.purpose?.trim() ?? '',
+      place: dto.place?.trim() ?? '',
       unit: dto.unit,
       value: gram || dto.value == null ? null : BigInt(dto.value),
       grams: gram ? (dto.grams ?? 0) : null,

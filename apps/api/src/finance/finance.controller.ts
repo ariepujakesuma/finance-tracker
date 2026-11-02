@@ -13,7 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
-import { EntryDto, GoldPriceDto, HoldingDto, MonthDto, SettingsDto } from './finance.dto';
+import { BulkEntriesDto, EntryDto, GoldPriceDto, HoldingDto, MonthDto, SettingsDto } from './finance.dto';
 import { FinanceService } from './finance.service';
 
 @Controller()
@@ -28,6 +28,11 @@ export class FinanceController {
   @UseGuards(AuthGuard) @Post('entries')
   createEntry(@Body() dto: EntryDto) {
     return this.finance.createEntry(dto);
+  }
+
+  @UseGuards(AuthGuard) @Post('entries/bulk')
+  createEntries(@Body() dto: BulkEntriesDto) {
+    return this.finance.createEntries(dto.entries);
   }
 
   @UseGuards(AuthGuard) @Put('entries/:id')

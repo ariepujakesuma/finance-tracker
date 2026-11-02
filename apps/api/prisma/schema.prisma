@@ -39,6 +39,7 @@ model Holding {
   category    String   @default("") @db.VarChar(60)
   owner       String   @default("") @db.VarChar(60)
   purpose     String   @default("") @db.VarChar(120)
+  place       String   @default("") @db.VarChar(60) // tempat penyimpanan, mis. Ajaib, BSI
   unit        String   @default("rp") @db.VarChar(8) // rp | gram
   value       BigInt?
   grams       Float?

@@ -7,7 +7,7 @@ export type Entry = {
 };
 export type MonthState = { paid: Record<string, boolean>; amt: Record<string, number> };
 export type Holding = {
-  id: string; name: string; category: string; owner: string; purpose: string; unit: 'rp' | 'gram';
+  id: string; name: string; category: string; owner: string; purpose: string; place: string; unit: 'rp' | 'gram';
   value: number | null; grams: number | null; price: number | null; monthly: number | null; since: string | null;
   estimate: boolean; note: string; priceDate: string | null; priceSource: string | null; updated: string | null;
 };
