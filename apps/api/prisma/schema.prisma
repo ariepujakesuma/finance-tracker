@@ -1,0 +1,71 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+// TiDB Serverless is MySQL-compatible. Use the connection string with ?sslaccept=strict
+datasource db {
+  provider     = "mysql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
+}
+
+/// Tagihan, pemasukan, atau alokasi. mode: cicilan | rutin | sekali
+model Entry {
+  id        String   @id @default(cuid()) @db.VarChar(40)
+  name      String   @db.VarChar(120)
+  flow      String   @db.VarChar(8)   // out | in | save
+  bank      String   @default("") @db.VarChar(60)
+  mode      String   @db.VarChar(10)
+  amount    Int
+  start     String   @db.VarChar(7)   // YYYY-MM
+  months    Int?
+  note      String   @default("") @db.VarChar(255)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Status per bulan: paid = {entryId: true}, amt = {entryId: nominal khusus bulan itu}
+model MonthState {
+  key       String   @id @db.VarChar(7)
+  paid      Json
+  amt       Json
+  updatedAt DateTime @updatedAt
+}
+
+model Holding {
+  id          String   @id @default(cuid()) @db.VarChar(40)
+  name        String   @db.VarChar(120)
+  category    String   @default("") @db.VarChar(60)
+  owner       String   @default("") @db.VarChar(60)
+  purpose     String   @default("") @db.VarChar(120)
+  unit        String   @default("rp") @db.VarChar(8) // rp | gram
+  value       BigInt?
+  grams       Float?
+  price       Int?
+  monthly     Int?
+  since       String?  @db.VarChar(7)
+  estimate    Boolean  @default(false)
+  note        String   @default("") @db.VarChar(255)
+  priceDate   String?  @db.VarChar(10)
+  priceSource String?  @db.VarChar(60)
+  updated     String?  @db.VarChar(10)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Setting {
+  id        Int @id @default(1)
+  threshold Int @default(6000000)
+}
+
+/// Satu baris saja (id = 1). PIN disimpan sebagai hash bcrypt.
+model AuthConfig {
+  id           Int       @id @default(1)
+  pinHash      String    @db.VarChar(100)
+  hint         String    @db.VarChar(160)
+  failedCount  Int       @default(0)
+  lockedUntil  DateTime?
+  tokenVersion Int       @default(0)
+  updatedAt    DateTime  @updatedAt
+}

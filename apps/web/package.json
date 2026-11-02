@@ -1,0 +1,21 @@
+{
+  "name": "finance-web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "15.5.28",
+    "react": "19.0.9",
+    "react-dom": "19.0.9"
+  },
+  "devDependencies": {
+    "@types/node": "20.17.10",
+    "@types/react": "19.0.7",
+    "@types/react-dom": "19.0.3",
+    "typescript": "5.6.3"
+  }
+}

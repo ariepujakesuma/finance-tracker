@@ -1,0 +1,13 @@
+{
+ "entries": [
+  {"id": "ex-kulkas", "name": "Cicilan Kulkas", "flow": "out", "bank": "BCA", "mode": "cicilan", "amount": 500000, "start": "2026-11", "months": 6, "note": "contoh"},
+  {"id": "ex-internet", "name": "Internet Rumah", "flow": "out", "bank": "Mandiri", "mode": "rutin", "amount": 300000, "start": "2026-11", "months": null, "note": "contoh"},
+  {"id": "ex-gaji", "name": "Gaji", "flow": "in", "bank": "Kantor", "mode": "rutin", "amount": 10000000, "start": "2026-11", "months": null, "note": "contoh"},
+  {"id": "ex-tabungan", "name": "Tabungan Bulanan", "flow": "save", "bank": "BCA", "mode": "rutin", "amount": 1000000, "start": "2026-11", "months": null, "note": "contoh"}
+ ],
+ "months": [],
+ "holdings": [
+  {"id": "ex-emas", "name": "Emas Contoh", "category": "Emas", "owner": "", "purpose": "Contoh", "unit": "gram", "value": null, "grams": 10, "price": 2000000, "monthly": null, "since": null, "estimate": false, "note": "", "priceDate": "2026-11-01", "priceSource": "manual", "updated": "2026-11-01"}
+ ],
+ "settings": {"threshold": 6000000}
+}

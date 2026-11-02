@@ -1,0 +1,60 @@
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  Min,
+  ValidateIf,
+} from 'class-validator';
+
+const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+export class EntryDto {
+  @IsString() @MaxLength(120) name: string;
+  @IsIn(['out', 'in', 'save']) flow: string;
+  @IsOptional() @IsString() @MaxLength(60) bank?: string;
+  @IsIn(['cicilan', 'rutin', 'sekali']) mode: string;
+  @IsInt() @Min(0) amount: number;
+  @Matches(MONTH) start: string;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsInt() @Min(1) months?: number | null;
+  @IsOptional() @IsString() @MaxLength(255) note?: string;
+}
+
+export class MonthDto {
+  @IsObject() paid: Record<string, boolean>;
+  @IsObject() amt: Record<string, number>;
+}
+
+export class HoldingDto {
+  @IsString() @MaxLength(120) name: string;
+  @IsOptional() @IsString() @MaxLength(60) category?: string;
+  @IsOptional() @IsString() @MaxLength(60) owner?: string;
+  @IsOptional() @IsString() @MaxLength(120) purpose?: string;
+  @IsIn(['rp', 'gram']) unit: string;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsInt() @Min(0) value?: number | null;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsNumber() @Min(0) grams?: number | null;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsInt() @Min(0) price?: number | null;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsInt() @Min(0) monthly?: number | null;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @Matches(MONTH) since?: string | null;
+  @IsOptional() @IsBoolean() estimate?: boolean;
+  @IsOptional() @IsString() @MaxLength(255) note?: string;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @Matches(DATE) priceDate?: string | null;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(60) priceSource?: string | null;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @Matches(DATE) updated?: string | null;
+}
+
+export class SettingsDto {
+  @IsInt() @Min(0) threshold: number;
+}
+
+export class GoldPriceDto {
+  @IsInt() @Min(1) price: number;
+  @Matches(DATE) priceDate: string;
+  @IsOptional() @IsString() @MaxLength(60) priceSource?: string;
+}
