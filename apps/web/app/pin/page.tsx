@@ -62,11 +62,11 @@ export default function PinPage() {
 
   return (
     <main className="gate">
-      <form className="gatecard" onSubmit={submit}>
+      <form className="gatecard glass" onSubmit={submit}>
         <h1>{tab === 'change' ? 'Ganti PIN' : 'Buat PIN baru'}</h1>
         <div className="tabs" role="tablist">
-          <button type="button" role="tab" aria-selected={tab === 'change'} onClick={() => switchTab('change')}>Ganti PIN</button>
-          <button type="button" role="tab" aria-selected={tab === 'reset'} onClick={() => switchTab('reset')}>Lupa PIN</button>
+          <button type="button" role="tab" className={`pill${tab === 'change' ? ' on' : ''}`} aria-selected={tab === 'change'} onClick={() => switchTab('change')}>Ganti PIN</button>
+          <button type="button" role="tab" className={`pill${tab === 'reset' ? ' on' : ''}`} aria-selected={tab === 'reset'} onClick={() => switchTab('reset')}>Lupa PIN</button>
         </div>
 
         {tab === 'change' ? (
@@ -81,7 +81,7 @@ export default function PinPage() {
             )}
             <label htmlFor="setupKey" className="hint" style={{ display: 'grid', gap: 6 }}>
               Setup key
-              <input id="setupKey" className="ghost" type="password" value={setupKey} onChange={(e) => setSetupKey(e.target.value)} />
+              <input id="setupKey" className="field" type="password" value={setupKey} onChange={(e) => setSetupKey(e.target.value)} />
             </label>
           </>
         )}
@@ -89,7 +89,7 @@ export default function PinPage() {
         <PinField id="newPin2" label="Ulangi PIN baru" value={newPin2} onChange={setNewPin2} />
         <label htmlFor="hint" className="hint" style={{ display: 'grid', gap: 6 }}>
           Petunjuk di layar masuk
-          <input id="hint" className="ghost" value={hint} maxLength={160} onChange={(e) => setHint(e.target.value)} />
+          <input id="hint" className="field" value={hint} maxLength={160} onChange={(e) => setHint(e.target.value)} />
         </label>
         {error && <p className="err" role="alert">{error}</p>}
         {done && <p className="ok" role="status">{done}</p>}

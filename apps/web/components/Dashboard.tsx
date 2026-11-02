@@ -21,6 +21,8 @@ export default function Dashboard() {
   const [editingAmt, setEditingAmt] = useState<string | null>(null);
   const [entryForm, setEntryForm] = useState<Entry | 'new' | null>(null);
   const [assetForm, setAssetForm] = useState<Holding | 'new' | null>(null);
+  const [menu, setMenu] = useState(false);
+  const [openBanks, setOpenBanks] = useState<Record<string, boolean>>({});
 
   const handleErr = useCallback(
     (err: unknown) => {
@@ -44,6 +46,19 @@ export default function Dashboard() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!menu) return;
+    const close = (ev: Event) => {
+      if (ev instanceof KeyboardEvent ? ev.key === 'Escape' : !(ev.target as Element).closest('.actions')) setMenu(false);
+    };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', close);
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('keydown', close);
+    };
+  }, [menu]);
 
   /** Optimistic change, then save; reload from server if the save fails. */
   async function mutate(next: (d: Data) => Data, save: () => Promise<unknown>, okMsg = 'Tersimpan') {
@@ -122,70 +137,89 @@ export default function Dashboard() {
             {e.flow === 'in' && e.bank && <span>{e.bank}</span>}
           </div>
         </div>
-        {editingAmt === e.id ? (
-          <AmountInput
-            id={`ov-${e.id}`}
-            initial={amountOf(data, e, sel)}
-            onDone={(v) => {
-              setEditingAmt(null);
-              if (v === null) return;
-              saveMonth(sel, (m) => { if (v === e.amount) delete m.amt[e.id]; else m.amt[e.id] = v; });
-            }}
-          />
-        ) : (
-          <button className="amt num" title="Ubah nominal khusus bulan ini" onClick={() => setEditingAmt(e.id)}>
-            {rp(amountOf(data, e, sel))}
-          </button>
-        )}
-        <button className="edit" aria-label={`Edit ${e.name}`} onClick={() => setEntryForm(e)}>Edit</button>
+        <div className="right">
+          {editingAmt === e.id ? (
+            <AmountInput
+              id={`ov-${e.id}`}
+              initial={amountOf(data, e, sel)}
+              onDone={(v) => {
+                setEditingAmt(null);
+                if (v === null) return;
+                saveMonth(sel, (m) => { if (v === e.amount) delete m.amt[e.id]; else m.amt[e.id] = v; });
+              }}
+            />
+          ) : (
+            <button className="amt num" title="Ubah nominal khusus bulan ini" onClick={() => setEditingAmt(e.id)}>
+              {rp(amountOf(data, e, sel))}
+            </button>
+          )}
+          <button className="edit" aria-label={`Edit ${e.name}`} onClick={() => setEntryForm(e)}>Edit</button>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="wrap">
-      <div className="top">
-        <div>
-          <h1>Arie Finance Tracker</h1>
-          <div className="status" aria-live="polite">{status}</div>
+      <header className="appbar glass">
+        <div className="appbar-top">
+          <div className="brand">
+            <span className="brand-dot" aria-hidden="true" />
+            <div style={{ minWidth: 0 }}>
+              <h1>Finance Tracker</h1>
+              <div className="status" aria-live="polite">{status}</div>
+            </div>
+          </div>
+          <div className="actions">
+            <button className="primary add-desktop" onClick={() => setEntryForm('new')}>+ Tambah</button>
+            <button className="round" aria-label="Menu" aria-expanded={menu} onClick={() => setMenu((m) => !m)}>⋯</button>
+            {menu && (
+              <div className="menu glass" role="menu" onClick={() => setMenu(false)}>
+                <button role="menuitem" onClick={() => setAssetForm('new')}>Tambah aset</button>
+                <Link role="menuitem" href="/pin">Ganti PIN</Link>
+                <button role="menuitem" onClick={logout}>Keluar</button>
+              </div>
+            )}
+          </div>
         </div>
-        <div className="monthnav">
-          <button className="iconbtn" aria-label="Bulan sebelumnya" onClick={() => setSel(key(idx(sel) - 1))}>‹</button>
+        <nav className="monthbar" aria-label="Pilih bulan">
+          <button className="round" aria-label="Bulan sebelumnya" onClick={() => setSel(key(idx(sel) - 1))}>‹</button>
           <div className="monthlabel">{longL(sel)}</div>
-          <button className="iconbtn" aria-label="Bulan berikutnya" onClick={() => setSel(key(idx(sel) + 1))}>›</button>
-          <button className="ghost" onClick={() => setSel(today.month)}>Bulan ini</button>
-        </div>
-        <div className="monthnav">
-          <Link className="ghost" href="/pin">Ganti PIN</Link>
-          <button className="ghost" onClick={logout}>Keluar</button>
-          <button className="primary" onClick={() => setEntryForm('new')}>+ Tambah</button>
-        </div>
-      </div>
+          {sel !== today.month && <button className="pill on" onClick={() => setSel(today.month)}>Kini</button>}
+          <button className="round" aria-label="Bulan berikutnya" onClick={() => setSel(key(idx(sel) + 1))}>›</button>
+        </nav>
+      </header>
 
-      <section className="panel">
-        <div className="ledger">
+      <section className="glass panel hero">
+        <div className="hero-main">
+          <span className="label">Sisa bersih {longL(sel)}</span>
+          <span className={`big num${c.net < 0 ? ' neg' : ''}`}>{rp(c.net)}</span>
+          <span className="sub">setelah tagihan dan alokasi</span>
+        </div>
+        <div className="stats">
           <Stat label="Pemasukan" value={c.inc} />
           <Stat label="Tagihan" value={c.out} />
           <Stat label="Selisih" value={c.diff} />
-          <Stat label="Alokasi / tabungan" value={c.save} />
-          <Stat label="Sisa bersih" value={c.net} net />
+          <Stat label="Alokasi" value={c.save} />
         </div>
         <div className="progress">
-          <span>{nPaid} dari {bills.length} tagihan dibayar</span>
+          <div className="progress-row">
+            <span>{nPaid} dari {bills.length} tagihan dibayar</span>
+            <span className="num">{left ? 'sisa ' + rp(left) : 'lunas semua'}</span>
+          </div>
           <div className="track"><i style={{ width: bills.length ? `${(nPaid / bills.length) * 100}%` : 0 }} /></div>
-          <span className="num">{left ? 'sisa ' + rp(left) : 'lunas semua'}</span>
         </div>
       </section>
 
-      <section className="panel">
-        <div className="top" style={{ marginBottom: 10 }}>
+      <section className="glass panel">
+        <div className="panel-head">
           <h2>Aset saat ini</h2>
-          <button className="ghost" onClick={() => setAssetForm('new')}>+ Aset</button>
+          <button className="pill" onClick={() => setAssetForm('new')}>+ Aset</button>
         </div>
-        <div className="ledger">
+        <div className="stats three">
           <Stat label="Total aset" value={totalAssets} />
-          <Stat label="Sisa cicilan berjalan" value={debt} title={`Cicilan yang belum dibayar mulai ${longL(sel)}`} />
-          <Stat label="Aset − sisa cicilan" value={totalAssets - debt} net />
+          <Stat label="Sisa cicilan" value={debt} title={`Cicilan yang belum dibayar mulai ${longL(sel)}`} />
+          <Stat label="Aset − cicilan" value={totalAssets - debt} />
         </div>
         <div style={{ marginTop: 10 }}>
           {holdings.length ? (
@@ -216,8 +250,10 @@ export default function Dashboard() {
                       {h.updated && h.unit !== 'gram' && <span>· diperbarui {fmtDate(h.updated)}</span>}
                     </div>
                   </div>
-                  <span className="num" style={{ padding: '4px 6px' }}>{rp(holdingValue(h, today.month))}</span>
-                  <button className="edit" aria-label={`Edit ${h.name}`} onClick={() => setAssetForm(h)}>Edit</button>
+                  <div className="right">
+                    <span className="num" style={{ fontWeight: 500 }}>{rp(holdingValue(h, today.month))}</span>
+                    <button className="edit" aria-label={`Edit ${h.name}`} onClick={() => setAssetForm(h)}>Edit</button>
+                  </div>
                 </div>
               );
             })
@@ -227,8 +263,8 @@ export default function Dashboard() {
         </div>
       </section>
 
-      <section className="panel">
-        <div className="top" style={{ marginBottom: 8 }}>
+      <section className="glass panel">
+        <div className="panel-head">
           <h2>Proyeksi tagihan 14 bulan</h2>
           <ThresholdInput
             value={data.settings.threshold}
@@ -242,8 +278,8 @@ export default function Dashboard() {
       </section>
 
       <div className="cols">
-        <section className="panel">
-          <div className="top"><h2>Tagihan bulan ini</h2><span className="hint">Klik nominal untuk ubah khusus bulan ini</span></div>
+        <section className="glass panel">
+          <div className="panel-head"><h2>Tagihan bulan ini</h2><span className="hint">Ketuk nominal untuk ubah bulan ini saja</span></div>
           {!loaded ? (
             <div className="empty">Memuat tagihan…</div>
           ) : Object.keys(byBank).length ? (
@@ -251,14 +287,22 @@ export default function Dashboard() {
               const list = byBank[b].sort((x, y) => amountOf(data, y, sel) - amountOf(data, x, sel));
               const sub = list.reduce((s, e) => s + amountOf(data, e, sel), 0);
               const allPaid = list.every((e) => paid[e.id]);
+              const showRows = !allPaid || openBanks[`${sel}:${b}`];
               return (
                 <div className="bank" key={b}>
                   <div className="bankhead">
-                    <span>{b} {allPaid && <span className="chip last">lunas</span>}</span>
+                    <span className="bankname">
+                      {b} {allPaid && <span className="chip last">lunas</span>}
+                      {allPaid && (
+                        <button className="edit" aria-expanded={!!showRows} onClick={() => setOpenBanks((o) => ({ ...o, [`${sel}:${b}`]: !showRows }))}>
+                          {showRows ? 'Sembunyikan' : `Lihat ${list.length}`}
+                        </button>
+                      )}
+                    </span>
                     <span className="bankr">
                       <span className="num">{rp(sub)}</span>
                       <button
-                        className={`ghost banklunas${allPaid ? ' undo' : ''}`}
+                        className={`banklunas${allPaid ? ' undo' : ''}`}
                         onClick={() =>
                           saveMonth(
                             sel,
@@ -271,7 +315,7 @@ export default function Dashboard() {
                       </button>
                     </span>
                   </div>
-                  {list.map((e) => entryRow(e, true))}
+                  {showRows && list.map((e) => entryRow(e, true))}
                 </div>
               );
             })
@@ -280,16 +324,16 @@ export default function Dashboard() {
           )}
         </section>
         <div className="stack">
-          <section className="panel">
-            <h2>Pemasukan</h2>
+          <section className="glass panel">
+            <div className="panel-head"><h2>Pemasukan</h2></div>
             {incomes.length ? incomes.map((e) => entryRow(e, false)) : <div className="empty">Belum ada pemasukan di bulan ini.</div>}
           </section>
-          <section className="panel">
-            <h2>Alokasi / tabungan</h2>
+          <section className="glass panel">
+            <div className="panel-head"><h2>Alokasi / tabungan</h2></div>
             {saves.length ? saves.map((e) => entryRow(e, true)) : <div className="empty">Tidak ada alokasi di bulan ini.</div>}
           </section>
-          <section className="panel ending">
-            <h2>Cicilan yang lunas bulan ini</h2>
+          <section className="glass panel ending">
+            <div className="panel-head"><h2>Cicilan yang lunas bulan ini</h2></div>
             <ul>
               {ending.length ? (
                 ending.map((e) => (
@@ -302,6 +346,8 @@ export default function Dashboard() {
           </section>
         </div>
       </div>
+
+      <button className="fab" aria-label="Tambah entri" onClick={() => setEntryForm('new')}>+</button>
 
       {entryForm && (
         <EntryDialog
@@ -360,10 +406,10 @@ export default function Dashboard() {
   );
 }
 
-function Stat({ label, value, net, title }: { label: string; value: number; net?: boolean; title?: string }) {
+function Stat({ label, value, title }: { label: string; value: number; title?: string }) {
   return (
-    <div className={net ? 'net' : undefined} title={title}>
-      <span className="lbl">{label}</span>
+    <div className="stat" title={title}>
+      <span className="label">{label}</span>
       <span className={`val num${value < 0 ? ' neg' : ''}`}>{rp(value)}</span>
     </div>
   );
@@ -497,6 +543,7 @@ function EntryDialog({
   return (
     <dialog ref={ref}>
       <form className="f" onSubmit={submit}>
+        <div className="grab" aria-hidden="true" />
         <h2>{entry ? 'Edit entri' : 'Tambah entri'}</h2>
         <label htmlFor="fName">Nama<input id="fName" required value={f.name} onChange={set('name')} placeholder="mis. Kulkas BCA" /></label>
         <div className="two">
@@ -583,6 +630,7 @@ function AssetDialog({
   return (
     <dialog ref={ref}>
       <form className="f" onSubmit={submit}>
+        <div className="grab" aria-hidden="true" />
         <h2>{h ? 'Edit aset' : 'Tambah aset'}</h2>
         <label htmlFor="aName">Nama<input id="aName" required value={f.name} onChange={set('name')} placeholder="mis. Tabungan Haji Arie" /></label>
         <div className="two">

@@ -59,8 +59,8 @@ export default function LoginPage() {
   if (!status) {
     return (
       <main className="gate">
-        <div className="gatecard">
-          <h1>Arie Finance Tracker</h1>
+        <div className="gatecard glass">
+          <h1>Finance Tracker</h1>
           {error ? <p className="err">{error}</p> : <p className="lead">Memeriksa sesi…</p>}
         </div>
       </main>
@@ -70,19 +70,19 @@ export default function LoginPage() {
   if (!status.hasPin) {
     return (
       <main className="gate">
-        <form className="gatecard" onSubmit={setup}>
+        <form className="gatecard glass" onSubmit={setup}>
           <h1>Buat PIN</h1>
           <p className="lead">PIN ini dipakai untuk membuka dashboard di semua perangkat.</p>
           <PinField id="pin" label="PIN baru" value={pin} onChange={setPin} autoFocus />
           <PinField id="pin2" label="Ulangi PIN" value={pin2} onChange={setPin2} />
           <label htmlFor="hint" className="hint" style={{ display: 'grid', gap: 6 }}>
             Petunjuk yang tampil di layar masuk
-            <input id="hint" className="ghost" value={hint} maxLength={160} placeholder="mis. Masukkan tanggal penting (DDMMYYYY)" onChange={(e) => setHint(e.target.value)} />
+            <input id="hint" className="field" value={hint} maxLength={160} placeholder="mis. Masukkan tanggal penting (DDMMYYYY)" onChange={(e) => setHint(e.target.value)} />
           </label>
           {status.setupKeyRequired && (
             <label htmlFor="setupKey" className="hint" style={{ display: 'grid', gap: 6 }}>
               Setup key (dari env SETUP_KEY di server)
-              <input id="setupKey" className="ghost" type="password" value={setupKey} onChange={(e) => setSetupKey(e.target.value)} />
+              <input id="setupKey" className="field" type="password" value={setupKey} onChange={(e) => setSetupKey(e.target.value)} />
             </label>
           )}
           {error && <p className="err" role="alert">{error}</p>}
@@ -96,8 +96,8 @@ export default function LoginPage() {
 
   return (
     <main className="gate">
-      <form className="gatecard" onSubmit={login}>
-        <h1>Arie Finance Tracker</h1>
+      <form className="gatecard glass" onSubmit={login}>
+        <h1>Finance Tracker</h1>
         <div className="hintbox">{status.hint}</div>
         <PinField id="pin" label="PIN" value={pin} onChange={setPin} autoFocus />
         {locked && !error && (
