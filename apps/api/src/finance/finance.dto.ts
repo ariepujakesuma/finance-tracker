@@ -29,6 +29,7 @@ export class EntryDto {
   @Matches(MONTH) start: string;
   @IsOptional() @ValidateIf((_, v) => v !== null) @IsInt() @Min(1) months?: number | null;
   @IsOptional() @IsString() @MaxLength(255) note?: string;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(40) holdingId?: string | null;
 }
 
 export class BulkEntriesDto {

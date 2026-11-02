@@ -76,6 +76,10 @@ Menu **⋯ → Upload tagihan PDF** atau tombol **Upload PDF** di panel tagihan.
 - Setiap baris dicocokkan dengan tagihan bank yang sama di bulan itu: **sudah ada** (dilewati), **ubah nominal** (nominal khusus bulan itu), atau **baru** (cicilan `KE x DARI y` / `x/y` otomatis jadi cicilan dengan sisa bulan yang benar).
 - Pembayaran, pembatalan (mis. "Convert to IPP"), dan baris Rp0 dilewati.
 
+## Alokasi yang menambah aset
+
+Di form alokasi / tabungan ada pilihan **Masuk ke aset** (hanya aset bersatuan Rupiah). Saat alokasi itu dicentang di suatu bulan, server menambahkan nominal bulan itu ke nilai aset; lepas centang mengurangkannya lagi. Untuk aset dengan "setoran rutin otomatis" (mis. haji), estimasi otomatis berhenti di bulan sebelum alokasi yang tertaut mulai, supaya tidak terhitung dua kali.
+
 Setelah update yang menambah kolom database (mis. kolom `place` di aset), jalankan lagi dari laptop:
 
 ```bash

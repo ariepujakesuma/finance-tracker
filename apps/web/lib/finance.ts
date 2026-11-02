@@ -4,6 +4,8 @@ export type Mode = 'cicilan' | 'rutin' | 'sekali';
 export type Entry = {
   id: string; name: string; flow: Flow; bank: string; mode: Mode;
   amount: number; start: string; months: number | null; note: string;
+  /** allocations only: the asset that grows when this is ticked */
+  holdingId?: string | null;
 };
 export type MonthState = { paid: Record<string, boolean>; amt: Record<string, number> };
 export type Holding = {
@@ -59,13 +61,22 @@ export function monthCalc(d: Data, k: string) {
   return { inc, out, save, diff: inc - out, net: inc - out - save };
 }
 
-export const contribMonths = (h: Holding, thisMonth: string) =>
-  h.monthly && h.since ? Math.max(0, idx(thisMonth) - idx(h.since) + 1) : 0;
+/**
+ * Months of automatic "setoran rutin" counted into an asset's value.
+ * Once an allocation is linked to the asset, ticking it adds the deposit for real,
+ * so the automatic estimate stops the month before that allocation starts.
+ */
+export function contribMonths(h: Holding, thisMonth: string, entries: Entry[] = []) {
+  if (!h.monthly || !h.since) return 0;
+  const linked = entries.filter((e) => e.flow === 'save' && e.holdingId === h.id).map((e) => idx(e.start));
+  const last = linked.length ? Math.min(idx(thisMonth), Math.min(...linked) - 1) : idx(thisMonth);
+  return Math.max(0, last - idx(h.since) + 1);
+}
 
-export const holdingValue = (h: Holding, thisMonth: string) =>
+export const holdingValue = (h: Holding, thisMonth: string, entries: Entry[] = []) =>
   h.unit === 'gram'
     ? Math.round((h.grams || 0) * (h.price || 0))
-    : (h.value || 0) + (h.monthly || 0) * contribMonths(h, thisMonth);
+    : (h.value || 0) + (h.monthly || 0) * contribMonths(h, thisMonth, entries);
 
 /** Unpaid installment total from month k onward. */
 export function remainingDebt(d: Data, k: string) {

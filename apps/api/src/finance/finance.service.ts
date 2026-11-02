@@ -56,6 +56,7 @@ export class FinanceService {
       start: dto.start,
       months: dto.mode === 'sekali' ? null : (dto.months ?? null),
       note: dto.note?.trim() ?? '',
+      holdingId: dto.flow === 'save' ? dto.holdingId || null : null,
     };
   }
 
@@ -64,8 +65,40 @@ export class FinanceService {
     const amt = Object.fromEntries(
       Object.entries(dto.amt).filter(([, v]) => typeof v === 'number' && Number.isFinite(v) && v >= 0),
     );
-    await this.prisma.monthState.upsert({ where: { key }, create: { key, paid, amt }, update: { paid, amt } });
-    return { key, paid, amt };
+    // Ticking an allocation linked to an asset adds its amount to that asset; unticking takes it back.
+    // Done here, against the stored month, so the change happens exactly once per tick.
+    const changed = await this.prisma.$transaction(async (tx) => {
+      const before = await tx.monthState.findUnique({ where: { key } });
+      const oldPaid = (before?.paid ?? {}) as Record<string, boolean>;
+      const oldAmt = (before?.amt ?? {}) as Record<string, number>;
+      const ids = [...new Set([...Object.keys(oldPaid), ...Object.keys(paid)])];
+      const linked = ids.length
+        ? await tx.entry.findMany({ where: { id: { in: ids }, flow: 'save', NOT: { holdingId: null } } })
+        : [];
+      const delta = new Map<string, number>();
+      for (const e of linked) {
+        const was = oldPaid[e.id] === true;
+        const now = paid[e.id] === true;
+        if (was === now) continue;
+        const value = now ? (amt[e.id] ?? e.amount) : -(oldAmt[e.id] ?? e.amount);
+        delta.set(e.holdingId!, (delta.get(e.holdingId!) ?? 0) + value);
+      }
+      const updated = [];
+      for (const [holdingId, d] of delta) {
+        const h = await tx.holding.findUnique({ where: { id: holdingId } });
+        if (!h || h.unit !== 'rp' || d === 0) continue;
+        const next = (h.value ?? BigInt(0)) + BigInt(d);
+        updated.push(
+          await tx.holding.update({
+            where: { id: holdingId },
+            data: { value: next < 0 ? BigInt(0) : next, updated: new Date().toISOString().slice(0, 10) },
+          }),
+        );
+      }
+      await tx.monthState.upsert({ where: { key }, create: { key, paid, amt }, update: { paid, amt } });
+      return updated;
+    });
+    return { key, paid, amt, holdings: changed.map(strip) };
   }
 
   createHolding(dto: HoldingDto) {

@@ -66,8 +66,8 @@ export default function Dashboard() {
   async function mutate(next: (d: Data) => Data, save: () => Promise<unknown>, okMsg = 'Tersimpan') {
     setData((d) => next(d));
     try {
-      await save();
-      setStatus(okMsg);
+      const msg = await save();
+      setStatus(typeof msg === 'string' ? msg : okMsg);
     } catch (err) {
       handleErr(err);
       load();
@@ -78,7 +78,19 @@ export default function Dashboard() {
     const cur = data.months[k] || { paid: {}, amt: {} };
     const m: MonthState = { paid: { ...cur.paid }, amt: { ...cur.amt } };
     change(m);
-    mutate((d) => ({ ...d, months: { ...d.months, [k]: m } }), () => api(`/months/${k}`, { method: 'PUT', json: m }), msg);
+    mutate(
+      (d) => ({ ...d, months: { ...d.months, [k]: m } }),
+      async () => {
+        // Ticking a linked allocation changes an asset on the server; take the new values back.
+        const res = await api<{ holdings?: Holding[] }>(`/months/${k}`, { method: 'PUT', json: m });
+        if (res?.holdings?.length) {
+          const byId = new Map(res.holdings.map((h) => [h.id, h]));
+          setData((d) => ({ ...d, holdings: d.holdings.map((h) => byId.get(h.id) ?? h) }));
+          return `${res.holdings.map((h) => h.name).join(', ')} diperbarui`;
+        }
+      },
+      msg,
+    );
   }
 
   async function logout() {
@@ -99,9 +111,9 @@ export default function Dashboard() {
   const saves = data.entries.filter((e) => e.flow === 'save' && active(e, sel));
   const ending = bills.filter((e) => e.mode === 'cicilan' && e.months && idx(sel) - idx(e.start) === e.months - 1);
   const holdings = [...data.holdings].sort(
-    (a, b) => (a.category || '').localeCompare(b.category || '') || holdingValue(b, today.month) - holdingValue(a, today.month),
+    (a, b) => (a.category || '').localeCompare(b.category || '') || holdingValue(b, today.month, data.entries) - holdingValue(a, today.month, data.entries),
   );
-  const totalAssets = holdings.reduce((s, h) => s + holdingValue(h, today.month), 0);
+  const totalAssets = holdings.reduce((s, h) => s + holdingValue(h, today.month, data.entries), 0);
   const debt = remainingDebt(data, sel);
 
   function entryRow(e: Entry, check: boolean) {
@@ -135,6 +147,9 @@ export default function Dashboard() {
               <span className="chip">{e.mode}</span>
             )}
             {ov && <span className="chip ov">diubah</span>}
+            {e.flow === 'save' && e.holdingId && (
+              <span className="chip last">→ {data.holdings.find((h) => h.id === e.holdingId)?.name ?? 'aset'}</span>
+            )}
             {e.note && <span>{e.note}</span>}
             {e.flow === 'in' && e.bank && <span>{e.bank}</span>}
           </div>
@@ -247,7 +262,7 @@ export default function Dashboard() {
                       )}
                       {!!h.monthly && h.since && (
                         <span className="num">
-                          · awal {rp(h.value || 0)} + {rp(h.monthly)}/bln sejak {short(h.since)} ({contribMonths(h, today.month)}×)
+                          · awal {rp(h.value || 0)} + {rp(h.monthly)}/bln sejak {short(h.since)} ({contribMonths(h, today.month, data.entries)}×)
                         </span>
                       )}
                       {h.note && <span>· {h.note}</span>}
@@ -255,7 +270,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="right">
-                    <span className="num" style={{ fontWeight: 500 }}>{rp(holdingValue(h, today.month))}</span>
+                    <span className="num" style={{ fontWeight: 500 }}>{rp(holdingValue(h, today.month, data.entries))}</span>
                     <button className="edit" aria-label={`Edit ${h.name}`} onClick={() => setAssetForm(h)}>Edit</button>
                   </div>
                 </div>
@@ -369,6 +384,7 @@ export default function Dashboard() {
       {entryForm && (
         <EntryDialog
           entry={entryForm === 'new' ? null : entryForm}
+          holdings={data.holdings}
           defaultStart={sel}
           onClose={() => setEntryForm(null)}
           onSave={async (body, id) => {
@@ -532,19 +548,20 @@ function useDialog(onClose: () => void) {
 type EntryBody = Omit<Entry, 'id'>;
 
 function EntryDialog({
-  entry, defaultStart, onClose, onSave, onDelete,
+  entry, holdings, defaultStart, onClose, onSave, onDelete,
 }: {
-  entry: Entry | null; defaultStart: string; onClose: () => void;
+  entry: Entry | null; holdings: Holding[]; defaultStart: string; onClose: () => void;
   onSave: (b: EntryBody, id?: string) => void; onDelete: (id: string) => void;
 }) {
   const ref = useDialog(onClose);
   const [f, setF] = useState({
     name: entry?.name || '', flow: entry?.flow || 'out', bank: entry?.bank || '', mode: entry?.mode || 'cicilan',
     amount: entry ? String(entry.amount) : '', start: entry?.start || defaultStart,
-    months: entry?.months ? String(entry.months) : '', note: entry?.note || '',
+    months: entry?.months ? String(entry.months) : '', note: entry?.note || '', holdingId: entry?.holdingId || '',
   });
   const [arm, setArm] = useState(false);
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
+  const linkable = holdings.filter((h) => h.unit === 'rp');
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -552,6 +569,7 @@ function EntryDialog({
       {
         name: f.name.trim(), flow: f.flow as Entry['flow'], bank: f.bank.trim(), mode: f.mode as Entry['mode'],
         amount: num(f.amount), start: f.start, months: f.mode === 'sekali' ? null : Number(f.months) || null, note: f.note.trim(),
+        holdingId: f.flow === 'save' ? f.holdingId || null : null,
       },
       entry?.id,
     );
@@ -588,6 +606,15 @@ function EntryDialog({
             </label>
           )}
         </div>
+        {f.flow === 'save' && (
+          <label htmlFor="fHolding">Masuk ke aset
+            <select id="fHolding" value={f.holdingId} onChange={set('holdingId')}>
+              <option value="">– tidak menambah aset –</option>
+              {linkable.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+            </select>
+            <span className="hint">Saat dicentang, nominalnya ditambahkan ke aset ini. Lepas centang untuk membatalkan.</span>
+          </label>
+        )}
         <label htmlFor="fNote">Catatan<input id="fNote" value={f.note} onChange={set('note')} placeholder="opsional" /></label>
         {f.mode === 'cicilan' && <div className="hint">Mulai bulan = cicilan pertama yang masih harus dibayar, lalu isi jumlah bulan yang tersisa.</div>}
         <div className="actions">
