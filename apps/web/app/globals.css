@@ -191,6 +191,31 @@ dialog::backdrop { background: rgba(15, 23, 42, .35); backdrop-filter: blur(2px)
 .help ul { margin: 8px 0 0; padding-left: 18px }
 .f input[type=file] { padding: 8px; font-size: 14px }
 
+/* ---------- goals ---------- */
+.goal { display: grid; gap: 6px; padding: 12px 0; border-bottom: 1px solid var(--line) }
+.goal:first-of-type { padding-top: 0 }
+.goal:last-child { border-bottom: 0; padding-bottom: 0 }
+.goal-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center }
+.goal-foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--muted) }
+.f fieldset.pick { border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px 10px; margin: 0; display: grid; gap: 6px; min-width: 0 }
+.f fieldset.pick legend { font-size: 13px; color: var(--muted); padding: 0 4px }
+.f .pick .check { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 8px; font-size: 14px }
+.pick-name { overflow-wrap: anywhere }
+
+/* ---------- searchable bank picker ---------- */
+.combo { position: relative }
+.f .combo input { padding-right: 34px }
+.combo-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 26px; height: 26px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font-size: 18px; line-height: 1 }
+.combo-clear:hover { background: var(--accent-soft) }
+.combo-list {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 5; margin: 0; padding: 4px; list-style: none;
+  max-height: 220px; overflow: auto; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--glass-strong); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: var(--glass-shadow);
+}
+.combo-list li { padding: 9px 10px; border-radius: 8px; font-size: 15px; color: var(--ink); cursor: pointer }
+.combo-list li.on { background: var(--accent-soft) }
+.combo-list li.add { color: var(--accent); font-weight: 500 }
+
 /* ---------- PIN screens ---------- */
 .gate { min-height: 100dvh; display: grid; place-items: center; padding-block: 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
 .gatecard { width: min(420px, 100%); padding: 28px 22px; display: grid; gap: 16px }

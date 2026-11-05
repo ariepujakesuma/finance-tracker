@@ -57,6 +57,25 @@ model Holding {
   updatedAt   DateTime @updatedAt
 }
 
+/// Target tabungan. Progres = total nilai aset tertaut; kalau tidak ada aset tertaut, pakai `saved` (diisi manual).
+model Goal {
+  id         String   @id @default(cuid()) @db.VarChar(40)
+  name       String   @db.VarChar(120)
+  target     BigInt
+  saved      BigInt   @default(0)
+  deadline   String?  @db.VarChar(7) // YYYY-MM
+  holdingIds Json     // string[]
+  note       String   @default("") @db.VarChar(255)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+/// Bank / tempat menabung yang ditambahkan sendiri (di luar daftar bawaan di web).
+model Bank {
+  name      String   @id @db.VarChar(60)
+  createdAt DateTime @default(now())
+}
+
 model Setting {
   id        Int @id @default(1)
   threshold Int @default(6000000)

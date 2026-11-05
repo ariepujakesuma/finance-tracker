@@ -13,9 +13,30 @@ export type Holding = {
   value: number | null; grams: number | null; price: number | null; monthly: number | null; since: string | null;
   estimate: boolean; note: string; priceDate: string | null; priceSource: string | null; updated: string | null;
 };
+/** Savings target. Progress comes from linked assets; with none linked, from `saved` (typed in by hand). */
+export type Goal = {
+  id: string; name: string; target: number; saved: number; deadline: string | null; holdingIds: string[]; note: string;
+};
 export type Data = {
   entries: Entry[]; months: Record<string, MonthState>; holdings: Holding[]; settings: { threshold: number };
+  goals: Goal[]; banks: string[];
 };
+
+/** Built-in choices for "bank / tempat menabung". Banks the user adds are stored on the server. */
+export const DEFAULT_BANKS = [
+  'BCA', 'Mandiri', 'BRI', 'BNI', 'BSI', 'Jenius', 'SeaBank', 'Bank Jago', 'blu by BCA', 'CIMB Niaga',
+  'Permata', 'Danamon', 'OCBC', 'Ajaib', 'Bibit', 'Bareksa', 'Pegadaian', 'Antam / fisik', 'Cash',
+];
+
+/** Defaults + added banks + every bank/place already used, without case-insensitive duplicates. */
+export function bankOptions(d: Data) {
+  const seen = new Map<string, string>();
+  for (const b of [...DEFAULT_BANKS, ...d.banks, ...d.holdings.map((h) => h.place), ...d.entries.map((e) => e.bank)]) {
+    const t = b?.trim();
+    if (t && !seen.has(t.toLowerCase())) seen.set(t.toLowerCase(), t);
+  }
+  return [...seen.values()].sort((a, b) => a.localeCompare(b, 'id'));
+}
 
 export const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 const MONL = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -95,3 +116,22 @@ export function remainingDebt(d: Data, k: string) {
 
 export const daysSince = (iso?: string | null) =>
   iso ? Math.floor((Date.now() - new Date(iso + 'T00:00:00+07:00').getTime()) / 864e5) : null;
+
+/** Where a goal stands this month: collected amount, monthly inflow, and when it finishes at that pace. */
+export function goalStatus(g: Goal, d: Data, thisMonth: string) {
+  const linked = d.holdings.filter((h) => g.holdingIds.includes(h.id));
+  const saved = linked.length ? linked.reduce((s, h) => s + holdingValue(h, thisMonth, d.entries), 0) : g.saved;
+  // Monthly inflow: allocations into the linked assets, plus automatic "setoran rutin" still being estimated.
+  const allocs = d.entries.filter((e) => e.flow === 'save' && e.holdingId && g.holdingIds.includes(e.holdingId) && active(e, thisMonth));
+  const auto = linked
+    .filter((h) => h.unit === 'rp' && h.monthly && !d.entries.some((e) => e.flow === 'save' && e.holdingId === h.id))
+    .reduce((s, h) => s + (h.monthly || 0), 0);
+  const monthly = allocs.reduce((s, e) => s + amountOf(d, e, thisMonth), 0) + auto;
+  const gap = Math.max(0, g.target - saved);
+  const pct = g.target > 0 ? Math.min(100, (saved / g.target) * 100) : 0;
+  const monthsLeft = g.deadline ? idx(g.deadline) - idx(thisMonth) + 1 : null; // includes this month
+  const needPerMonth = gap && monthsLeft && monthsLeft > 0 ? Math.ceil(gap / monthsLeft) : null;
+  const eta = gap === 0 ? thisMonth : monthly > 0 ? key(idx(thisMonth) + Math.ceil(gap / monthly) - 1) : null;
+  const late = !!(gap && g.deadline && (eta === null ? true : idx(eta) > idx(g.deadline)));
+  return { saved, monthly, gap, pct, monthsLeft, needPerMonth, eta, late, linked };
+}

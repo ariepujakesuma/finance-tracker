@@ -80,7 +80,19 @@ Menu **⋯ → Upload tagihan PDF** atau tombol **Upload PDF** di panel tagihan.
 
 Di form alokasi / tabungan ada pilihan **Masuk ke aset** (hanya aset bersatuan Rupiah). Saat alokasi itu dicentang di suatu bulan, server menambahkan nominal bulan itu ke nilai aset; lepas centang mengurangkannya lagi. Untuk aset dengan "setoran rutin otomatis" (mis. haji), estimasi otomatis berhenti di bulan sebelum alokasi yang tertaut mulai, supaya tidak terhitung dua kali.
 
-Setelah update yang menambah kolom database (mis. kolom `place` di aset), jalankan lagi dari laptop:
+## Target tabungan
+
+Panel **Target tabungan** (tombol **+ Target** atau menu **⋯ → Tambah target**).
+
+- Isi nama, nominal target, dan bulan target (opsional).
+- Centang aset di **Dihitung dari aset** supaya progres otomatis = total nilai aset itu. Alokasi yang masuk ke aset tersebut ikut menambah progres saat dicentang. Tanpa aset tertaut, isi **Sudah terkumpul** manual.
+- Ditampilkan: persen, kekurangan, kebutuhan per bulan sampai tenggat, dan perkiraan bulan tercapai dari setoran yang berjalan sekarang.
+
+## Pilih bank
+
+Field **Nabung di** (aset) dan **Bank / sumber** (entri) memakai dropdown yang bisa dicari. Kalau bank belum ada, pilih **+ Tambah "…"**; bank itu tersimpan di database dan muncul lagi di dropdown berikutnya.
+
+Setelah update yang menambah kolom database (mis. kolom `place` di aset, tabel `Goal` dan `Bank`), jalankan lagi dari laptop:
 
 ```bash
 cd apps/api && npx prisma db push
@@ -123,5 +135,7 @@ Endpoint ini mengubah harga semua aset bersatuan gram. Bisa dipanggil dari sched
 | POST/PUT/DELETE | `/entries[/:id]` | tagihan, pemasukan, alokasi |
 | PUT | `/months/:YYYY-MM` | `{paid, amt}` status bayar dan nominal khusus bulan |
 | POST/PUT/DELETE | `/holdings[/:id]` | aset |
+| POST/PUT/DELETE | `/goals[/:id]` | target tabungan `{name, target, saved?, deadline?, holdingIds, note?}` |
+| POST | `/banks` | `{name}` tambah bank ke dropdown |
 | PUT | `/settings` | `{threshold}` batas cicilan baru |
 | POST | `/gold-price` | header `x-cron-secret` |

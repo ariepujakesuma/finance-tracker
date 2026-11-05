@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
-import { EntryDto, GoldPriceDto, HoldingDto, MonthDto, SettingsDto } from './finance.dto';
+import { BankDto, EntryDto, GoalDto, GoldPriceDto, HoldingDto, MonthDto, SettingsDto } from './finance.dto';
 
 const strip = <T extends { createdAt?: Date; updatedAt?: Date }>(r: T) => {
   const { createdAt, updatedAt, ...rest } = r;
@@ -12,17 +12,21 @@ export class FinanceService {
   constructor(private prisma: PrismaService) {}
 
   async all() {
-    const [entries, months, holdings, setting] = await Promise.all([
+    const [entries, months, holdings, setting, goals, banks] = await Promise.all([
       this.prisma.entry.findMany({ orderBy: { createdAt: 'asc' } }),
       this.prisma.monthState.findMany(),
       this.prisma.holding.findMany({ orderBy: { createdAt: 'asc' } }),
       this.prisma.setting.findUnique({ where: { id: 1 } }),
+      this.prisma.goal.findMany({ orderBy: { createdAt: 'asc' } }),
+      this.prisma.bank.findMany({ orderBy: { name: 'asc' } }),
     ]);
     return {
       entries: entries.map(strip),
       months: Object.fromEntries(months.map((m) => [m.key, { paid: m.paid ?? {}, amt: m.amt ?? {} }])),
       holdings: holdings.map(strip),
       settings: { threshold: setting?.threshold ?? 6000000 },
+      goals: goals.map(strip),
+      banks: banks.map((b) => b.name),
     };
   }
 
@@ -135,6 +139,41 @@ export class FinanceService {
       priceSource: gram ? (dto.priceSource ?? null) : null,
       updated: dto.updated ?? new Date().toISOString().slice(0, 10),
     };
+  }
+
+  createGoal(dto: GoalDto) {
+    return this.prisma.goal.create({ data: this.goalData(dto) }).then(strip);
+  }
+
+  async updateGoal(id: string, dto: GoalDto) {
+    const found = await this.prisma.goal.findUnique({ where: { id }, select: { id: true } });
+    if (!found) throw new NotFoundException('Data tidak ditemukan. Muat ulang halaman.');
+    return this.prisma.goal.update({ where: { id }, data: this.goalData(dto) }).then(strip);
+  }
+
+  async deleteGoal(id: string) {
+    await this.prisma.goal.deleteMany({ where: { id } });
+    return { ok: true };
+  }
+
+  private goalData(dto: GoalDto) {
+    const holdingIds = [...new Set(dto.holdingIds)];
+    return {
+      name: dto.name.trim(),
+      target: BigInt(dto.target),
+      saved: holdingIds.length ? BigInt(0) : BigInt(dto.saved ?? 0),
+      deadline: dto.deadline ?? null,
+      holdingIds,
+      note: dto.note?.trim() ?? '',
+    };
+  }
+
+  /** Adds a bank to the picker list; adding one that already exists is a no-op. */
+  async addBank(dto: BankDto) {
+    const name = dto.name.trim().replace(/\s+/g, ' ');
+    if (!name) throw new BadRequestException('Nama bank kosong.');
+    await this.prisma.bank.upsert({ where: { name }, create: { name }, update: {} });
+    return { name };
   }
 
   async saveSettings(dto: SettingsDto) {

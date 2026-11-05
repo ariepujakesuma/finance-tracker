@@ -13,7 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
-import { BulkEntriesDto, EntryDto, GoldPriceDto, HoldingDto, MonthDto, SettingsDto } from './finance.dto';
+import { BankDto, BulkEntriesDto, EntryDto, GoalDto, GoldPriceDto, HoldingDto, MonthDto, SettingsDto } from './finance.dto';
 import { FinanceService } from './finance.service';
 
 @Controller()
@@ -64,6 +64,26 @@ export class FinanceController {
   @UseGuards(AuthGuard) @Delete('holdings/:id')
   deleteHolding(@Param('id') id: string) {
     return this.finance.deleteHolding(id);
+  }
+
+  @UseGuards(AuthGuard) @Post('goals')
+  createGoal(@Body() dto: GoalDto) {
+    return this.finance.createGoal(dto);
+  }
+
+  @UseGuards(AuthGuard) @Put('goals/:id')
+  updateGoal(@Param('id') id: string, @Body() dto: GoalDto) {
+    return this.finance.updateGoal(id, dto);
+  }
+
+  @UseGuards(AuthGuard) @Delete('goals/:id')
+  deleteGoal(@Param('id') id: string) {
+    return this.finance.deleteGoal(id);
+  }
+
+  @UseGuards(AuthGuard) @Post('banks')
+  addBank(@Body() dto: BankDto) {
+    return this.finance.addBank(dto);
   }
 
   @UseGuards(AuthGuard) @Put('settings')

@@ -13,6 +13,7 @@ import {
   IsString,
   Matches,
   MaxLength,
+  MinLength,
   Min,
   ValidateIf,
 } from 'class-validator';
@@ -59,6 +60,19 @@ export class HoldingDto {
   @IsOptional() @ValidateIf((_, v) => v !== null) @Matches(DATE) priceDate?: string | null;
   @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(60) priceSource?: string | null;
   @IsOptional() @ValidateIf((_, v) => v !== null) @Matches(DATE) updated?: string | null;
+}
+
+export class GoalDto {
+  @IsString() @MaxLength(120) name: string;
+  @IsInt() @Min(1) target: number;
+  @IsOptional() @IsInt() @Min(0) saved?: number;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @Matches(MONTH) deadline?: string | null;
+  @IsArray() @ArrayMaxSize(50) @IsString({ each: true }) @MaxLength(40, { each: true }) holdingIds: string[];
+  @IsOptional() @IsString() @MaxLength(255) note?: string;
+}
+
+export class BankDto {
+  @IsString() @MinLength(1) @MaxLength(60) name: string;
 }
 
 export class SettingsDto {

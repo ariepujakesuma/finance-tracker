@@ -4,13 +4,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
+import BankPicker from './BankPicker';
 import StatementUpload from './StatementUpload';
 import {
-  active, amountOf, contribMonths, Data, daysSince, Entry, fmtDate, Holding, holdingValue, idx,
+  active, amountOf, bankOptions, contribMonths, Data, daysSince, Entry, fmtDate, Goal, goalStatus, Holding, holdingValue, idx,
   jakartaToday, key, longL, monthCalc, MonthState, num, remainingDebt, rp, short,
 } from '@/lib/finance';
 
-const EMPTY: Data = { entries: [], months: {}, holdings: [], settings: { threshold: 6000000 } };
+const EMPTY: Data = { entries: [], months: {}, holdings: [], settings: { threshold: 6000000 }, goals: [], banks: [] };
 
 export default function Dashboard() {
   const router = useRouter();
@@ -22,6 +23,7 @@ export default function Dashboard() {
   const [editingAmt, setEditingAmt] = useState<string | null>(null);
   const [entryForm, setEntryForm] = useState<Entry | 'new' | null>(null);
   const [assetForm, setAssetForm] = useState<Holding | 'new' | null>(null);
+  const [goalForm, setGoalForm] = useState<Goal | 'new' | null>(null);
   const [menu, setMenu] = useState(false);
   const [upload, setUpload] = useState(false);
   const [openBanks, setOpenBanks] = useState<Record<string, boolean>>({});
@@ -93,6 +95,13 @@ export default function Dashboard() {
     );
   }
 
+  /** Saves a bank typed into a picker, so it is offered next time even before anything uses it. */
+  function addBank(name: string) {
+    const n = name.trim();
+    if (!n || data.banks.some((b) => b.toLowerCase() === n.toLowerCase())) return;
+    mutate((d) => ({ ...d, banks: [...d.banks, n] }), () => api('/banks', { method: 'POST', json: { name: n } }), `${n} ditambahkan`);
+  }
+
   async function logout() {
     await api('/auth/logout', { method: 'POST' }).catch(() => {});
     router.replace('/login');
@@ -115,6 +124,7 @@ export default function Dashboard() {
   );
   const totalAssets = holdings.reduce((s, h) => s + holdingValue(h, today.month, data.entries), 0);
   const debt = remainingDebt(data, sel);
+  const banks = bankOptions(data);
 
   function entryRow(e: Entry, check: boolean) {
     const i = idx(sel) - idx(e.start);
@@ -194,6 +204,7 @@ export default function Dashboard() {
               <div className="menu glass" role="menu" onClick={() => setMenu(false)}>
                 <button role="menuitem" onClick={() => setUpload(true)}>Upload tagihan PDF</button>
                 <button role="menuitem" onClick={() => setAssetForm('new')}>Tambah aset</button>
+                <button role="menuitem" onClick={() => setGoalForm('new')}>Tambah target</button>
                 <Link role="menuitem" href="/pin">Ganti PIN</Link>
                 <button role="menuitem" onClick={logout}>Keluar</button>
               </div>
@@ -280,6 +291,65 @@ export default function Dashboard() {
             <div className="empty">{loaded ? 'Belum ada aset. Pakai + Aset untuk mencatat tabungan haji, emas, atau reksadana.' : 'Memuat aset…'}</div>
           )}
         </div>
+      </section>
+
+      <section className="glass panel">
+        <div className="panel-head">
+          <h2>Target tabungan</h2>
+          <button className="pill" onClick={() => setGoalForm('new')}>+ Target</button>
+        </div>
+        {data.goals.length ? (
+          data.goals.map((g) => {
+            const st = goalStatus(g, data, today.month);
+            const done = st.gap === 0;
+            return (
+              <div key={g.id} className="goal">
+                <div className="goal-head">
+                  <div className="name">
+                    <b>{g.name}</b>
+                    <div className="meta">
+                      {done ? (
+                        <span className="chip last">tercapai</span>
+                      ) : st.monthsLeft !== null && st.monthsLeft <= 0 ? (
+                        <span className="chip ov">lewat tenggat</span>
+                      ) : st.late ? (
+                        <span className="chip ov">belum terkejar</span>
+                      ) : g.deadline ? (
+                        <span className="chip last">sesuai jadwal</span>
+                      ) : null}
+                      {g.deadline && <span>target {short(g.deadline)}</span>}
+                      {st.linked.length > 0 && <span>· dari {st.linked.map((h) => h.name).join(', ')}</span>}
+                      {g.note && <span>· {g.note}</span>}
+                    </div>
+                  </div>
+                  <div className="right">
+                    <span className="num" style={{ fontWeight: 500 }}>{Math.floor(st.pct)}%</span>
+                    <button className="edit" aria-label={`Edit ${g.name}`} onClick={() => setGoalForm(g)}>Edit</button>
+                  </div>
+                </div>
+                <div className="track" role="progressbar" aria-label={`Progres ${g.name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.floor(st.pct)}>
+                  <i style={{ width: `${st.pct}%` }} />
+                </div>
+                <div className="goal-foot">
+                  <span className="num">{rp(st.saved)} dari {rp(g.target)}</span>
+                  {!done && <span className="num">kurang {rp(st.gap)}</span>}
+                </div>
+                {!done && (
+                  <div className="meta">
+                    {st.needPerMonth !== null && <span className="num">Perlu {rp(st.needPerMonth)}/bln selama {st.monthsLeft} bln</span>}
+                    {st.monthly > 0 ? (
+                      <span className="num">· setoran sekarang {rp(st.monthly)}/bln → tercapai ±{st.eta ? short(st.eta) : '–'}</span>
+                    ) : (
+                      st.linked.length > 0 && <span>· belum ada alokasi rutin ke aset ini</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        ) : (
+          <div className="empty">{loaded ? 'Belum ada target. Pakai + Target untuk dana darurat, DP rumah, atau pendidikan anak.' : 'Memuat target…'}</div>
+        )}
       </section>
 
       <section className="glass panel">
@@ -385,6 +455,8 @@ export default function Dashboard() {
         <EntryDialog
           entry={entryForm === 'new' ? null : entryForm}
           holdings={data.holdings}
+          banks={banks}
+          onAddBank={addBank}
           defaultStart={sel}
           onClose={() => setEntryForm(null)}
           onSave={async (body, id) => {
@@ -413,6 +485,8 @@ export default function Dashboard() {
         <AssetDialog
           holding={assetForm === 'new' ? null : assetForm}
           today={today.iso}
+          banks={banks}
+          onAddBank={addBank}
           onClose={() => setAssetForm(null)}
           onSave={async (body, id) => {
             setAssetForm(null);
@@ -432,6 +506,33 @@ export default function Dashboard() {
           onDelete={(id) => {
             setAssetForm(null);
             mutate((d) => ({ ...d, holdings: d.holdings.filter((x) => x.id !== id) }), () => api(`/holdings/${id}`, { method: 'DELETE' }), 'Dihapus');
+          }}
+        />
+      )}
+      {goalForm && (
+        <GoalDialog
+          goal={goalForm === 'new' ? null : goalForm}
+          holdings={data.holdings}
+          valueOf={(h) => holdingValue(h, today.month, data.entries)}
+          onClose={() => setGoalForm(null)}
+          onSave={async (body, id) => {
+            setGoalForm(null);
+            try {
+              if (id) {
+                const saved = await api<Goal>(`/goals/${id}`, { method: 'PUT', json: body });
+                setData((d) => ({ ...d, goals: d.goals.map((x) => (x.id === id ? saved : x)) }));
+              } else {
+                const saved = await api<Goal>('/goals', { method: 'POST', json: body });
+                setData((d) => ({ ...d, goals: [...d.goals, saved] }));
+              }
+              setStatus('Tersimpan');
+            } catch (err) {
+              handleErr(err);
+            }
+          }}
+          onDelete={(id) => {
+            setGoalForm(null);
+            mutate((d) => ({ ...d, goals: d.goals.filter((x) => x.id !== id) }), () => api(`/goals/${id}`, { method: 'DELETE' }), 'Dihapus');
           }}
         />
       )}
@@ -548,9 +649,9 @@ function useDialog(onClose: () => void) {
 type EntryBody = Omit<Entry, 'id'>;
 
 function EntryDialog({
-  entry, holdings, defaultStart, onClose, onSave, onDelete,
+  entry, holdings, banks, onAddBank, defaultStart, onClose, onSave, onDelete,
 }: {
-  entry: Entry | null; holdings: Holding[]; defaultStart: string; onClose: () => void;
+  entry: Entry | null; holdings: Holding[]; banks: string[]; onAddBank: (n: string) => void; defaultStart: string; onClose: () => void;
   onSave: (b: EntryBody, id?: string) => void; onDelete: (id: string) => void;
 }) {
   const ref = useDialog(onClose);
@@ -587,9 +688,10 @@ function EntryDialog({
               <option value="out">Tagihan</option><option value="in">Pemasukan</option><option value="save">Alokasi / tabungan</option>
             </select>
           </label>
-          <label htmlFor="fBank">Bank / sumber<input id="fBank" list="banks" value={f.bank} onChange={set('bank')} placeholder="BCA" /></label>
+          <label htmlFor="fBank">Bank / sumber
+            <BankPicker id="fBank" value={f.bank} options={banks} onChange={(v) => setF((x) => ({ ...x, bank: v }))} onAdd={onAddBank} />
+          </label>
         </div>
-        <datalist id="banks"><option value="BCA" /><option value="Jenius" /><option value="Mandiri" /><option value="BSI" /><option value="Cash" /></datalist>
         <div className="two">
           <label htmlFor="fMode">Jenis
             <select id="fMode" value={f.mode} onChange={set('mode')}>
@@ -634,12 +736,10 @@ function EntryDialog({
 
 type HoldingBody = Omit<Holding, 'id'>;
 
-const PLACES = ['Ajaib', 'Bibit', 'Bareksa', 'BSI', 'BCA', 'Mandiri', 'Jenius', 'Pegadaian', 'Antam / fisik', 'Lainnya'];
-
 function AssetDialog({
-  holding, today, onClose, onSave, onDelete,
+  holding, today, banks, onAddBank, onClose, onSave, onDelete,
 }: {
-  holding: Holding | null; today: string; onClose: () => void;
+  holding: Holding | null; today: string; banks: string[]; onAddBank: (n: string) => void; onClose: () => void;
   onSave: (b: HoldingBody, id?: string) => void; onDelete: (id: string) => void;
 }) {
   const ref = useDialog(onClose);
@@ -660,7 +760,7 @@ function AssetDialog({
     const priceChanged = price !== (h?.price ?? null);
     onSave(
       {
-        name: f.name.trim(), category: f.category.trim(), owner: f.owner.trim(), purpose: f.purpose.trim(), place: f.place,
+        name: f.name.trim(), category: f.category.trim(), owner: f.owner.trim(), purpose: f.purpose.trim(), place: f.place.trim(),
         unit: f.unit as Holding['unit'], value: gram ? null : num(f.value),
         grams: gram ? Number(f.grams.replace(',', '.')) || 0 : null, price,
         monthly: gram ? null : num(f.monthly) || null, since: gram ? null : f.since || null,
@@ -686,11 +786,8 @@ function AssetDialog({
         <datalist id="acats"><option value="Haji" /><option value="Emas" /><option value="Reksadana" /><option value="Tabungan" /><option value="Deposito" /><option value="Saham" /></datalist>
         <div className="two">
           <label htmlFor="aPurpose">Tujuan<input id="aPurpose" value={f.purpose} onChange={set('purpose')} placeholder="mis. Pendidikan anak" /></label>
-          <label htmlFor="aPlace">Disimpan di
-            <select id="aPlace" value={f.place} onChange={set('place')}>
-              <option value="">–</option>
-              {[...new Set([...PLACES, ...(f.place ? [f.place] : [])])].map((p) => <option key={p}>{p}</option>)}
-            </select>
+          <label htmlFor="aPlace">Nabung di
+            <BankPicker id="aPlace" value={f.place} options={banks} onChange={(v) => setF((x) => ({ ...x, place: v }))} onAdd={onAddBank} />
           </label>
         </div>
         <div className="two">
@@ -719,6 +816,84 @@ function AssetDialog({
         <div className="actions">
           {h && (
             <button type="button" className="ghost danger" onClick={() => (arm ? onDelete(h.id) : setArm(true))}>
+              {arm ? 'Yakin hapus?' : 'Hapus'}
+            </button>
+          )}
+          <span style={{ flex: 1 }} />
+          <button type="button" className="ghost" onClick={() => ref.current?.close()}>Batal</button>
+          <button type="submit" className="primary">Simpan</button>
+        </div>
+      </form>
+    </dialog>
+  );
+}
+
+type GoalBody = Omit<Goal, 'id'>;
+
+function GoalDialog({
+  goal, holdings, valueOf, onClose, onSave, onDelete,
+}: {
+  goal: Goal | null; holdings: Holding[]; valueOf: (h: Holding) => number; onClose: () => void;
+  onSave: (b: GoalBody, id?: string) => void; onDelete: (id: string) => void;
+}) {
+  const ref = useDialog(onClose);
+  const [f, setF] = useState({
+    name: goal?.name || '', target: goal ? String(goal.target) : '', saved: goal?.saved ? String(goal.saved) : '',
+    deadline: goal?.deadline || '', note: goal?.note || '',
+  });
+  const [ids, setIds] = useState<string[]>(goal?.holdingIds.filter((id) => holdings.some((h) => h.id === id)) ?? []);
+  const [arm, setArm] = useState(false);
+  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
+  const linkedTotal = holdings.filter((h) => ids.includes(h.id)).reduce((s, h) => s + valueOf(h), 0);
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    onSave(
+      {
+        name: f.name.trim(), target: num(f.target), saved: ids.length ? 0 : num(f.saved),
+        deadline: f.deadline || null, holdingIds: ids, note: f.note.trim(),
+      },
+      goal?.id,
+    );
+  }
+
+  return (
+    <dialog ref={ref}>
+      <form className="f" onSubmit={submit}>
+        <div className="grab" aria-hidden="true" />
+        <h2>{goal ? 'Edit target' : 'Tambah target'}</h2>
+        <label htmlFor="gName">Nama<input id="gName" required value={f.name} onChange={set('name')} placeholder="mis. Dana darurat" /></label>
+        <div className="two">
+          <label htmlFor="gTarget">Target (Rp)<input id="gTarget" inputMode="numeric" required value={f.target} onChange={set('target')} placeholder="50000000" /></label>
+          <label htmlFor="gDeadline">Tercapai bulan<input id="gDeadline" type="month" value={f.deadline} onChange={set('deadline')} /></label>
+        </div>
+        <fieldset className="pick">
+          <legend>Dihitung dari aset</legend>
+          {holdings.length ? (
+            holdings.map((h) => (
+              <label key={h.id} htmlFor={`gh-${h.id}`} className="check">
+                <input
+                  id={`gh-${h.id}`}
+                  type="checkbox"
+                  checked={ids.includes(h.id)}
+                  onChange={(e) => setIds((cur) => (e.target.checked ? [...cur, h.id] : cur.filter((x) => x !== h.id)))}
+                />
+                <span className="pick-name">{h.name}{h.place && <span className="hint"> · {h.place}</span>}</span>
+                <span className="num hint">{rp(valueOf(h))}</span>
+              </label>
+            ))
+          ) : (
+            <span className="hint">Belum ada aset. Isi jumlah terkumpul manual di bawah.</span>
+          )}
+          {ids.length > 0 && <span className="hint">Terkumpul otomatis: <b className="num">{rp(linkedTotal)}</b>. Alokasi yang masuk ke aset ini ikut menambah progres.</span>}
+        </fieldset>
+        {!ids.length && (
+          <label htmlFor="gSaved">Sudah terkumpul (Rp)<input id="gSaved" inputMode="numeric" value={f.saved} onChange={set('saved')} placeholder="0" /></label>
+        )}
+        <label htmlFor="gNote">Catatan<input id="gNote" value={f.note} onChange={set('note')} placeholder="opsional" /></label>
+        <div className="actions">
+          {goal && (
+            <button type="button" className="ghost danger" onClick={() => (arm ? onDelete(goal.id) : setArm(true))}>
               {arm ? 'Yakin hapus?' : 'Hapus'}
             </button>
           )}
