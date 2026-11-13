@@ -76,6 +76,8 @@ export default function Dashboard() {
     }
   }
 
+  const monthQueue = useRef<Record<string, Promise<unknown>>>({});
+
   function saveMonth(k: string, change: (m: MonthState) => void, msg?: string) {
     const cur = data.months[k] || { paid: {}, amt: {} };
     const m: MonthState = { paid: { ...cur.paid }, amt: { ...cur.amt } };
@@ -83,8 +85,13 @@ export default function Dashboard() {
     mutate(
       (d) => ({ ...d, months: { ...d.months, [k]: m } }),
       async () => {
+        // One save per month at a time, in click order: parallel PUTs of the whole month could land
+        // out of order and leave an older snapshot (and wrong asset totals) on the server.
+        const prev = monthQueue.current[k] ?? Promise.resolve();
+        const req = prev.catch(() => {}).then(() => api<{ holdings?: Holding[] }>(`/months/${k}`, { method: 'PUT', json: m }));
+        monthQueue.current[k] = req;
         // Ticking a linked allocation changes an asset on the server; take the new values back.
-        const res = await api<{ holdings?: Holding[] }>(`/months/${k}`, { method: 'PUT', json: m });
+        const res = await req;
         if (res?.holdings?.length) {
           const byId = new Map(res.holdings.map((h) => [h.id, h]));
           setData((d) => ({ ...d, holdings: d.holdings.map((h) => byId.get(h.id) ?? h) }));
@@ -461,8 +468,11 @@ export default function Dashboard() {
           onClose={() => setEntryForm(null)}
           onSave={async (body, id) => {
             setEntryForm(null);
+            setStatus('Menyimpan…');
             try {
               if (id) {
+                // Show the edit right away; the server copy replaces it when it arrives.
+                setData((d) => ({ ...d, entries: d.entries.map((x) => (x.id === id ? { ...x, ...body, id } : x)) }));
                 const saved = await api<Entry>(`/entries/${id}`, { method: 'PUT', json: body });
                 setData((d) => ({ ...d, entries: d.entries.map((x) => (x.id === id ? saved : x)) }));
               } else {
@@ -472,6 +482,7 @@ export default function Dashboard() {
               setStatus('Tersimpan');
             } catch (err) {
               handleErr(err);
+              if (id) load();
             }
           }}
           onDelete={(id) => {
@@ -490,8 +501,11 @@ export default function Dashboard() {
           onClose={() => setAssetForm(null)}
           onSave={async (body, id) => {
             setAssetForm(null);
+            setStatus('Menyimpan…');
             try {
               if (id) {
+                // Show the edit right away; the server copy replaces it when it arrives.
+                setData((d) => ({ ...d, holdings: d.holdings.map((x) => (x.id === id ? { ...x, ...body, id } : x)) }));
                 const saved = await api<Holding>(`/holdings/${id}`, { method: 'PUT', json: body });
                 setData((d) => ({ ...d, holdings: d.holdings.map((x) => (x.id === id ? saved : x)) }));
               } else {
@@ -501,6 +515,7 @@ export default function Dashboard() {
               setStatus('Tersimpan');
             } catch (err) {
               handleErr(err);
+              if (id) load();
             }
           }}
           onDelete={(id) => {
@@ -517,8 +532,11 @@ export default function Dashboard() {
           onClose={() => setGoalForm(null)}
           onSave={async (body, id) => {
             setGoalForm(null);
+            setStatus('Menyimpan…');
             try {
               if (id) {
+                // Show the edit right away; the server copy replaces it when it arrives.
+                setData((d) => ({ ...d, goals: d.goals.map((x) => (x.id === id ? { ...x, ...body, id } : x)) }));
                 const saved = await api<Goal>(`/goals/${id}`, { method: 'PUT', json: body });
                 setData((d) => ({ ...d, goals: d.goals.map((x) => (x.id === id ? saved : x)) }));
               } else {
@@ -528,6 +546,7 @@ export default function Dashboard() {
               setStatus('Tersimpan');
             } catch (err) {
               handleErr(err);
+              if (id) load();
             }
           }}
           onDelete={(id) => {

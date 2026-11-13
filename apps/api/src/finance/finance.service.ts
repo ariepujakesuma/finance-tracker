@@ -7,6 +7,14 @@ const strip = <T extends { createdAt?: Date; updatedAt?: Date }>(r: T) => {
   return rest;
 };
 
+/** Update without a separate existence check: a missing row (P2025) becomes a 404. */
+const notFound = (err: unknown): never => {
+  if ((err as { code?: string } | null)?.code === 'P2025') {
+    throw new NotFoundException('Data tidak ditemukan. Muat ulang halaman.');
+  }
+  throw err;
+};
+
 @Injectable()
 export class FinanceService {
   constructor(private prisma: PrismaService) {}
@@ -41,8 +49,7 @@ export class FinanceService {
   }
 
   async updateEntry(id: string, dto: EntryDto) {
-    await this.exists('entry', id);
-    return this.prisma.entry.update({ where: { id }, data: this.entryData(dto) }).then(strip);
+    return this.prisma.entry.update({ where: { id }, data: this.entryData(dto) }).then(strip, notFound);
   }
 
   async deleteEntry(id: string) {
@@ -110,8 +117,7 @@ export class FinanceService {
   }
 
   async updateHolding(id: string, dto: HoldingDto) {
-    await this.exists('holding', id);
-    return this.prisma.holding.update({ where: { id }, data: this.holdingData(dto) }).then(strip);
+    return this.prisma.holding.update({ where: { id }, data: this.holdingData(dto) }).then(strip, notFound);
   }
 
   async deleteHolding(id: string) {
@@ -146,9 +152,7 @@ export class FinanceService {
   }
 
   async updateGoal(id: string, dto: GoalDto) {
-    const found = await this.prisma.goal.findUnique({ where: { id }, select: { id: true } });
-    if (!found) throw new NotFoundException('Data tidak ditemukan. Muat ulang halaman.');
-    return this.prisma.goal.update({ where: { id }, data: this.goalData(dto) }).then(strip);
+    return this.prisma.goal.update({ where: { id }, data: this.goalData(dto) }).then(strip, notFound);
   }
 
   async deleteGoal(id: string) {
@@ -192,13 +196,5 @@ export class FinanceService {
       data: { price: dto.price, priceDate: dto.priceDate, priceSource: dto.priceSource ?? 'buyback Antam' },
     });
     return { updated: r.count };
-  }
-
-  private async exists(kind: 'entry' | 'holding', id: string) {
-    const found =
-      kind === 'entry'
-        ? await this.prisma.entry.findUnique({ where: { id }, select: { id: true } })
-        : await this.prisma.holding.findUnique({ where: { id }, select: { id: true } });
-    if (!found) throw new NotFoundException('Data tidak ditemukan. Muat ulang halaman.');
   }
 }

@@ -14,6 +14,9 @@ export const COOKIE = 'ft_session';
 const MAX_ATTEMPTS = 5;
 const LOCK_MINUTES = 15;
 const SESSION_DAYS = 30;
+// verifyToken runs on every request; keep tokenVersion in memory briefly instead of a DB round-trip each time.
+// A PIN change on another warm instance takes effect there within this window.
+const VERSION_TTL_MS = 60_000;
 export const DEFAULT_HINT = 'Masukkan PIN';
 
 /** Accept "12-05-2020", "12/05/2020" or "12052020" — only the digits count. */
@@ -27,7 +30,21 @@ export function normalizePin(pin: unknown): string {
 
 @Injectable()
 export class AuthService {
+  private version: { v: number; at: number } | null = null;
+
   constructor(private prisma: PrismaService) {}
+
+  private remember(tokenVersion: number) {
+    this.version = { v: tokenVersion, at: Date.now() };
+  }
+
+  private async tokenVersion(): Promise<number | null> {
+    if (this.version && Date.now() - this.version.at < VERSION_TTL_MS) return this.version.v;
+    const cfg = await this.config();
+    if (!cfg) return null;
+    this.remember(cfg.tokenVersion);
+    return cfg.tokenVersion;
+  }
 
   private secret() {
     const s = process.env.JWT_SECRET;
@@ -40,6 +57,7 @@ export class AuthService {
   }
 
   sign(tokenVersion: number) {
+    this.remember(tokenVersion);
     return jwt.sign({ v: tokenVersion }, this.secret(), { expiresIn: `${SESSION_DAYS}d` });
   }
 
@@ -57,8 +75,8 @@ export class AuthService {
     if (!token) return false;
     try {
       const payload = jwt.verify(token, this.secret()) as { v: number };
-      const cfg = await this.config();
-      return !!cfg && cfg.tokenVersion === payload.v;
+      const v = await this.tokenVersion();
+      return v !== null && v === payload.v;
     } catch {
       return false;
     }
